@@ -385,7 +385,7 @@ const state = {
   expanded: new Set()
 };
 
-// ---- Populate dropdowns ----
+// ---- Populate dropdowns (cascading: org narrows route, org+route narrows leg) ----
 const orgSelect = document.getElementById('orgSelect');
 const routeSelect = document.getElementById('routeSelect');
 const legSelect = document.getElementById('legSelect');
@@ -397,22 +397,62 @@ uniqueSorted(GROUPS.map(g=>g.org)).forEach(o=>{
   const opt = document.createElement('option'); opt.value=o; opt.textContent=o;
   orgSelect.appendChild(opt);
 });
-uniqueSorted(GROUPS.map(g=>g.route)).forEach(r=>{
-  const opt = document.createElement('option'); opt.value=r; opt.textContent=r;
-  routeSelect.appendChild(opt);
-});
-ALL_LEGS.forEach(l=>{
-  const opt = document.createElement('option'); opt.value=l; opt.textContent=l;
-  legSelect.appendChild(opt);
-});
 
-orgSelect.addEventListener('change', e=>{ state.org = e.target.value; render(); });
-routeSelect.addEventListener('change', e=>{ state.route = e.target.value; render(); });
+function rebuildRouteOptions(){
+  const rows = RAW.filter(r=> !state.org || r.org === state.org);
+  const routes = uniqueSorted(rows.map(r=>r.routes));
+  const prev = state.route;
+  routeSelect.innerHTML = '<option value="">All routes</option>';
+  routes.forEach(r=>{
+    const opt = document.createElement('option'); opt.value=r; opt.textContent=r;
+    routeSelect.appendChild(opt);
+  });
+  if(prev && routes.includes(prev)){
+    routeSelect.value = prev;
+  } else {
+    state.route = "";
+    routeSelect.value = "";
+  }
+}
+
+function rebuildLegOptions(){
+  const rows = RAW.filter(r=> (!state.org || r.org === state.org) && (!state.route || r.routes === state.route));
+  const legs = uniqueSortedArr(rows.flatMap(r=>atomicLegs(r.legs)));
+  const prev = state.leg;
+  legSelect.innerHTML = '<option value="">All legs</option>';
+  legs.forEach(l=>{
+    const opt = document.createElement('option'); opt.value=l; opt.textContent=l;
+    legSelect.appendChild(opt);
+  });
+  if(prev && legs.includes(prev)){
+    legSelect.value = prev;
+  } else {
+    state.leg = "";
+    legSelect.value = "";
+  }
+}
+
+rebuildRouteOptions();
+rebuildLegOptions();
+
+orgSelect.addEventListener('change', e=>{
+  state.org = e.target.value;
+  rebuildRouteOptions();
+  rebuildLegOptions();
+  render();
+});
+routeSelect.addEventListener('change', e=>{
+  state.route = e.target.value;
+  rebuildLegOptions();
+  render();
+});
 legSelect.addEventListener('change', e=>{ state.leg = e.target.value; render(); });
 searchBox.addEventListener('input', e=>{ state.search = e.target.value.trim().toLowerCase(); render(); });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   state.org=""; state.route=""; state.leg=""; state.search=""; state.activeCats.clear();
-  orgSelect.value=""; routeSelect.value=""; legSelect.value=""; searchBox.value="";
+  orgSelect.value=""; searchBox.value="";
+  rebuildRouteOptions();
+  rebuildLegOptions();
   render();
 });
 
