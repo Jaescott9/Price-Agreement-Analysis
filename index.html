@@ -304,6 +304,10 @@
       <select id="routeSelect"><option value="">All routes</option></select>
     </div>
     <div class="field">
+      <label for="legSelect">Leg</label>
+      <select id="legSelect"><option value="">All legs</option></select>
+    </div>
+    <div class="field">
       <label for="searchBox">Search</label>
       <input type="text" id="searchBox" placeholder="Org, route or leg…">
     </div>
@@ -363,10 +367,17 @@ function buildGroups(rows){
 
 const GROUPS = buildGroups(RAW);
 
+function atomicLegs(legStr){
+  return legStr.split('|').map(s=>s.trim()).filter(Boolean);
+}
+const ALL_LEGS = uniqueSortedArr(RAW.flatMap(r=>atomicLegs(r.legs)));
+function uniqueSortedArr(arr){ return Array.from(new Set(arr)).sort((a,b)=>a.localeCompare(b)); }
+
 // ---- State ----
 const state = {
   org: "",
   route: "",
+  leg: "",
   search: "",
   activeCats: new Set(), // empty = all shown
   sortKey: "total",
@@ -377,6 +388,7 @@ const state = {
 // ---- Populate dropdowns ----
 const orgSelect = document.getElementById('orgSelect');
 const routeSelect = document.getElementById('routeSelect');
+const legSelect = document.getElementById('legSelect');
 const searchBox = document.getElementById('searchBox');
 
 function uniqueSorted(arr){ return Array.from(new Set(arr)).sort((a,b)=>a.localeCompare(b)); }
@@ -389,13 +401,18 @@ uniqueSorted(GROUPS.map(g=>g.route)).forEach(r=>{
   const opt = document.createElement('option'); opt.value=r; opt.textContent=r;
   routeSelect.appendChild(opt);
 });
+ALL_LEGS.forEach(l=>{
+  const opt = document.createElement('option'); opt.value=l; opt.textContent=l;
+  legSelect.appendChild(opt);
+});
 
 orgSelect.addEventListener('change', e=>{ state.org = e.target.value; render(); });
 routeSelect.addEventListener('change', e=>{ state.route = e.target.value; render(); });
+legSelect.addEventListener('change', e=>{ state.leg = e.target.value; render(); });
 searchBox.addEventListener('input', e=>{ state.search = e.target.value.trim().toLowerCase(); render(); });
 document.getElementById('resetBtn').addEventListener('click', ()=>{
-  state.org=""; state.route=""; state.search=""; state.activeCats.clear();
-  orgSelect.value=""; routeSelect.value=""; searchBox.value="";
+  state.org=""; state.route=""; state.leg=""; state.search=""; state.activeCats.clear();
+  orgSelect.value=""; routeSelect.value=""; legSelect.value=""; searchBox.value="";
   render();
 });
 
@@ -443,20 +460,6 @@ columns.forEach(col=>{
 });
 
 // ---- Filtering / sorting / render ----
-function matchesFilters(g){
-  if(state.org && g.org !== state.org) return false;
-  if(state.route && g.route !== state.route) return false;
-  if(state.search){
-    const hay = (g.org + ' ' + g.route + ' ' + g.legs.map(l=>l.legs).join(' ')).toLowerCase();
-    if(!hay.includes(state.search)) return false;
-  }
-  if(state.activeCats.size > 0){
-    const hasCat = CATEGORIES.some(c=> state.activeCats.has(c) && g.catTotals[c] > 0);
-    if(!hasCat) return false;
-  }
-  return true;
-}
-
 function sortGroups(list){
   const key = state.sortKey, dir = state.sortDir === 'asc' ? 1 : -1;
   return list.slice().sort((a,b)=>{
@@ -483,7 +486,8 @@ function render(){
     }
   });
 
-  const filtered = sortGroups(GROUPS.filter(matchesFilters));
+  const filteredRaw = RAW.filter(rawRowMatchesFilters);
+  const filtered = sortGroups(buildGroups(filteredRaw));
   const body = document.getElementById('matrixBody');
   const emptyState = document.getElementById('emptyState');
   body.innerHTML = '';
@@ -610,6 +614,7 @@ function buildDetail(g){
 function rawRowMatchesFilters(r){
   if(state.org && r.org !== state.org) return false;
   if(state.route && r.routes !== state.route) return false;
+  if(state.leg && !atomicLegs(r.legs).includes(state.leg)) return false;
   if(state.search){
     const hay = (r.org + ' ' + r.routes + ' ' + r.legs).toLowerCase();
     if(!hay.includes(state.search)) return false;
@@ -645,6 +650,7 @@ function exportFiltered(){
   const parts = [];
   if(state.org) parts.push(state.org);
   if(state.route) parts.push(state.route);
+  if(state.leg) parts.push(state.leg);
   if(state.activeCats.size) parts.push(Array.from(state.activeCats).join('-'));
   const suffix = parts.length ? '_' + parts.join('_').replace(/[^a-z0-9\-]+/gi,'') : '';
   XLSX.writeFile(wb, `spt_agreements_filtered${suffix}.xlsx`);
