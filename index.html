@@ -101,8 +101,14 @@
     background:var(--panel);
     color:var(--ink);
     min-width:180px;
+    max-width:240px;
   }
-  input[type=text]{min-width:220px;}
+  select{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  input[type=text]{min-width:220px; max-width:260px;}
   select:focus, input:focus{outline:2px solid var(--accent); outline-offset:1px;}
 
   .cat-legend{
@@ -161,6 +167,7 @@
 
   table.matrix{
     width:100%;
+    min-width:1260px;
     border-collapse:collapse;
     table-layout:fixed;
   }
@@ -321,16 +328,16 @@
     <div style="overflow-x:auto;">
     <table class="matrix" id="matrixTable">
       <colgroup>
-        <col style="width:7%">
-        <col style="width:15%">
-        <col style="width:20%">
-        <col style="width:9%">
-        <col style="width:9%">
-        <col style="width:9%">
-        <col style="width:9%">
-        <col style="width:9%">
-        <col style="width:6%">
-        <col style="width:7%">
+        <col style="width:80px">
+        <col style="width:230px">
+        <col style="width:230px">
+        <col style="width:110px">
+        <col style="width:110px">
+        <col style="width:110px">
+        <col style="width:100px">
+        <col style="width:110px">
+        <col style="width:80px">
+        <col style="width:100px">
       </colgroup>
       <thead>
         <tr id="headerRow"></tr>
