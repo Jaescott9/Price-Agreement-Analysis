@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SPOT Agreements — Category by Route & Org</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg: #f7f7f5;
@@ -139,6 +140,17 @@
     cursor:pointer;
   }
   .reset-btn:hover{border-color:var(--ink);color:var(--ink);}
+  .export-btn{
+    font-size:12px;
+    color:#fff;
+    background:var(--accent);
+    border:1px solid var(--accent);
+    border-radius:6px;
+    padding:7px 12px;
+    cursor:pointer;
+  }
+  .export-btn:hover{opacity:.9;}
+  .export-btn:disabled{opacity:.5; cursor:default;}
 
   .panel{
     background:var(--panel);
@@ -297,6 +309,7 @@
     </div>
     <div class="cat-legend" id="catLegend"></div>
     <button class="reset-btn" id="resetBtn">Reset filters</button>
+    <button class="export-btn" id="exportBtn">Export filtered data (.xlsx)</button>
   </div>
 
   <div class="panel">
@@ -525,6 +538,7 @@ function render(){
   }
 
   renderTotals(filtered);
+  document.getElementById('exportBtn').disabled = filtered.length === 0;
   document.getElementById('footnote').textContent =
     `Showing ${filtered.length} of ${GROUPS.length} org / route combinations · ${RAW.length} source rows from SPT_Use_cases.xlsx.`;
 }
@@ -591,6 +605,52 @@ function buildDetail(g){
 
   return wrap;
 }
+
+// ---- Export currently filtered data to Excel ----
+function rawRowMatchesFilters(r){
+  if(state.org && r.org !== state.org) return false;
+  if(state.route && r.routes !== state.route) return false;
+  if(state.search){
+    const hay = (r.org + ' ' + r.routes + ' ' + r.legs).toLowerCase();
+    if(!hay.includes(state.search)) return false;
+  }
+  if(state.activeCats.size > 0 && !state.activeCats.has(r.category)) return false;
+  return true;
+}
+
+function exportFiltered(){
+  const rows = RAW.filter(rawRowMatchesFilters);
+  if(rows.length === 0){
+    alert('No rows match the current filters — nothing to export.');
+    return;
+  }
+  const sheetData = rows.map(r=>({
+    'Org': r.org,
+    'Route': r.routes,
+    'Leg(s)': r.legs,
+    'Category': r.category,
+    'Updatable': r.updatable,
+    'Not updatable': r.not_updatable,
+    'Total': r.total,
+    'Pct updatable': r.pct_updatable,
+    'Agreement numbers': r.agreements.join(', ')
+  }));
+  const ws = XLSX.utils.json_to_sheet(sheetData);
+  ws['!cols'] = [
+    {wch:8},{wch:14},{wch:10},{wch:20},{wch:11},{wch:13},{wch:8},{wch:13},{wch:60}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Filtered agreements');
+
+  const parts = [];
+  if(state.org) parts.push(state.org);
+  if(state.route) parts.push(state.route);
+  if(state.activeCats.size) parts.push(Array.from(state.activeCats).join('-'));
+  const suffix = parts.length ? '_' + parts.join('_').replace(/[^a-z0-9\-]+/gi,'') : '';
+  XLSX.writeFile(wb, `spt_agreements_filtered${suffix}.xlsx`);
+}
+
+document.getElementById('exportBtn').addEventListener('click', exportFiltered);
 
 function renderTotals(filtered){
   const totalsEl = document.getElementById('totals');
