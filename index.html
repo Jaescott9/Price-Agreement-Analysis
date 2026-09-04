@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SPT Agreements — Category by Route & Org</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg: #f7f7f5;
@@ -691,23 +691,55 @@ function exportFiltered(){
     alert('No rows match the current filters — nothing to export.');
     return;
   }
-  const sheetData = rows.map(r=>({
-    'Org': r.org,
-    'Route': r.routes,
-    'Leg(s)': r.legs,
-    'Category': r.category,
-    'Updatable': r.updatable,
-    'Not updatable': r.not_updatable,
-    'Total': r.total,
-    'Pct updatable': r.pct_updatable,
-    'Agreement numbers': r.agreements.join(', ')
-  }));
+
+  // Summary sheet — one row per org/route/leg/category combination.
+  // Agreement numbers are capped per cell (Excel's hard limit is 32,767
+  // characters per cell); anything beyond that is truncated with a note,
+  // and the full list always lives in the second sheet below.
+  const MAX_CELL_CHARS = 32000;
+  const sheetData = rows.map(r=>{
+    const full = r.agreements.join(', ');
+    let cellText = full;
+    if(full.length > MAX_CELL_CHARS){
+      cellText = full.slice(0, MAX_CELL_CHARS) + ` … (truncated — see "Agreement numbers" sheet for the full list of ${r.agreements.length})`;
+    }
+    return {
+      'Org': r.org,
+      'Route': r.routes,
+      'Leg(s)': r.legs,
+      'Category': r.category,
+      'Updatable': r.updatable,
+      'Not updatable': r.not_updatable,
+      'Total': r.total,
+      'Pct updatable': r.pct_updatable,
+      'Agreement numbers': cellText
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(sheetData);
   ws['!cols'] = [
     {wch:8},{wch:14},{wch:10},{wch:20},{wch:11},{wch:13},{wch:8},{wch:13},{wch:60}
   ];
+
+  // Second sheet — one row per individual agreement number, so the full
+  // list is always available regardless of per-cell length limits.
+  const agreementRows = [];
+  rows.forEach(r=>{
+    r.agreements.forEach(a=>{
+      agreementRows.push({
+        'Org': r.org,
+        'Route': r.routes,
+        'Leg(s)': r.legs,
+        'Category': r.category,
+        'Agreement number': a
+      });
+    });
+  });
+  const ws2 = XLSX.utils.json_to_sheet(agreementRows);
+  ws2['!cols'] = [{wch:8},{wch:14},{wch:10},{wch:20},{wch:16}];
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Filtered agreements');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Agreement numbers');
 
   const parts = [];
   if(state.org) parts.push(state.org);
